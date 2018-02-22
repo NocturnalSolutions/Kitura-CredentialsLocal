@@ -32,7 +32,7 @@ public class CredentialsLocal: CredentialsPluginProtocol {
     ///                            redirected to this path, with a GET parameter
     ///                            of "redirectTo" corresponding to the path
     ///                            they were trying to access.
-    init(loginPagePath: String? = nil) {
+    public init(loginPagePath: String? = nil) {
         self.loginPagePath = loginPagePath
         redirecting = self.loginPagePath != nil
     }
