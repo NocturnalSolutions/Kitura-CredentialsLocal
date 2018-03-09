@@ -18,25 +18,17 @@ public class CredentialsLocal: CredentialsPluginProtocol {
 
     public func authenticate(request: RouterRequest, response: RouterResponse, options: [String : Any], onSuccess: @escaping (UserProfile) -> Void, onFailure: @escaping (HTTPStatusCode?, [String : String]?) -> Void, onPass: @escaping (HTTPStatusCode?, [String : String]?) -> Void, inProgress: @escaping () -> Void) {
         // That this method got called means that a user session was not loaded.
-        if let verifyPassword = verifyPassword, let post = request.body?.asURLEncoded, let user = post[usernamePostField], let pass = post[passwordPostField] {
-            verifyPassword(user, pass) { userProfile in
-                if let userProfile = userProfile {
-                    onSuccess(userProfile)
-                    return
-                }
-                else {
-                    onFailure(.forbidden, nil)
-                    return
-                }
+        guard let verifyPassword = verifyPassword, let post = request.body?.asURLEncoded, let user = post[usernamePostField], let pass = post[passwordPostField] else {
+            onPass(.forbidden, nil)
+            return
+        }
+        verifyPassword(user, pass) { userProfile in
+            if let userProfile = userProfile {
+                onSuccess(userProfile)
             }
-        }
-        if options.index(forKey: "failureRedirect") != nil {
-            // Trigger the redirect.
-            inProgress()
-        }
-        else {
-            // Show access denied page.
-            onFailure(.forbidden, nil)
+            else {
+                onFailure(.forbidden, nil)
+            }
         }
     }
 
