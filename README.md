@@ -6,9 +6,49 @@ This plug-in is only compatible with Kitura 2 and Swift 4.
 
 ## Usage
 
-Usage is similar to [Kitura-CredentialsHTTP](https://github.com/IBM-Swift/Kitura-CredentialsHTTP) in that you pass a closure that verifies the credentials when instantiating the plug-in.
+Usage is similar to [Kitura-CredentialsHTTP](https://github.com/IBM-Swift/Kitura-CredentialsHTTP) in that you pass a closure that verifies the credentials when instantiating the plug-in. There are two approaches to this.
 
-Here’s a sample main.swift that should show you all you need to do.
+The simpler approach is closest to how Kitura-CredentialsHTTP works. You pass a closure that takes a username, password, and callback method. The username and password will have been extracted from a URL-encoded POST body with "username" and "password" named values; if you want these fields to have different names in the form's HTML, override these by setting the `usernamePostField` and `passwordPostField` parameters, respectively.
+
+```swift
+let local = CredentialsLocal() { username, password, callback in
+    // Check to see if the username is "admin@example.com" and the password is
+    // "swordfish". In real use you'd probably be doing something like hashing
+    // the password and checking for the credentials in a database.
+    if username == "admin@example.com", password == "swordfish" {
+        // On success, pass a UserProfile object to the callback.
+        let userProfile = UserProfile(id: username, displayName: username, provider: "Local")
+        callback(userProfile)
+    }
+    else {
+        // On failure, pass nil to the callback.
+        callback(nil)
+    }
+}
+
+// Override the names of the respective fields.
+local.usernamePostField = "emailAddress"
+local.passwordPostField = "passphrase"
+```
+
+The second approach will need to be used if you need to validate more fields besides just a username and password field, or are using a form where the POST body will be encoded another way (such as "multipart/form-data"). In this case, the callback is passed the entire RouterRequest object. Here's an example where we validate a "captcha" field on the form alongside username and password fields.
+
+```swift
+let local = CredentialsLocal() { request, callback in
+    guard let body = request.body?.asURLEncoded, let userId = body["username"], let pass = body["password"], let cap = body["captchaVal"] else {
+        callback(nil)
+        return
+    }
+    if userId != "admin", pass != "swordfish", cap != "123456" {
+        callback(nil)
+        return
+    }
+    let userProfile = UserProfile(id: userId, displayName: userId, provider: "Local")
+    callback(userProfile)
+}
+```
+
+Here’s a sample main.swift with a more complete implementation example. (If you're not already well familiar with how to use forms with Kitura, I suggest reading the [relevant chapter](https://nocturnalsolutions.gitbooks.io/kitura-book/content/8-forms.html) in [Kitura Until Dawn](https://nocturnalsolutions.gitbooks.io/kitura-book/content/), my free Kitura e-book.)
 
 ```swift
 
@@ -99,6 +139,6 @@ Kitura.run()
 
 ## Troubleshooting
 
-This code has not yet been extensively tested, and I must confess I really had to grind my brain against the inner workings of Credentials and KituraSession to figure out how it should work. I highly recommend you test extensively before using on production projects.
+This code has so far only been lightly tested. As security is a major concern on the web, I highly recommend you test extensively before using on production projects.
 
-If you have any problems, please hit me up at ”nocturnal” on the IBM-Swift Slack server, ”_Nocturnal” on Freenode, or one of the other contact methods outlined on [my web site](http://nocturnal.solutions/).
+If you have any problems, please contact me via GitHub, as ”nocturnal” on the IBM-Swift Slack server, or as ”_Nocturnal” on Freenode. Other contact methods are outlined on [my web site](http://nocturnal.solutions/).
