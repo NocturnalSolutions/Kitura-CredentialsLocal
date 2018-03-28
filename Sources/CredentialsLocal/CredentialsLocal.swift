@@ -2,6 +2,7 @@ import Foundation
 import Kitura
 import KituraNet
 import Credentials
+import LoggerAPI
 
 public class CredentialsLocal: CredentialsPluginProtocol {
     public let name: String = "Local"
@@ -21,15 +22,19 @@ public class CredentialsLocal: CredentialsPluginProtocol {
         // Define our closure here to avoid duplication
         let successOrFailure: (UserProfile?) -> Void = { userProfile in
             if let userProfile = userProfile {
+                Log.info("CredentialsLocal: UserProfile created")
                 onSuccess(userProfile)
             }
             else {
+                Log.warning("CredentialsLocal: UserProfile creation failed")
                 onFailure(.forbidden, nil)
             }
         }
         // Are we using a simple password verifier?
         if let verifyPassword = verifyPassword {
+            Log.info("CredentialsLocal: Attempting simple verification")
             guard let post = request.body?.asURLEncoded, let user = post[usernamePostField], let pass = post[passwordPostField] else {
+                Log.warning("CredentialsLocal: Simple: Credentials not found in post body. (Are my usernamePostField and passwordPostField properties set correctly?)")
                 onPass(nil, nil)
                 return
             }
@@ -37,9 +42,11 @@ public class CredentialsLocal: CredentialsPluginProtocol {
         }
         // Are we using a verifier for the entire request object?
         else if let verifyRequest = verifyRequest {
+            Log.info("CredentialsLocal: Attempting request verification")
             verifyRequest(request, successOrFailure)
         }
         else {
+            Log.error("CredentialsLocal: authenticate method called but no verifier available (this should not be possible)")
             onPass(nil, nil)
         }
     }
