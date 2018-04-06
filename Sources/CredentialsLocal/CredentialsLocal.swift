@@ -9,7 +9,7 @@ public class CredentialsLocal: CredentialsPluginProtocol {
 
     public var usersCache: NSCache<NSString, BaseCacheElement>?
 
-    public let redirecting: Bool = true
+    public let redirecting: Bool = false
 
     // POST fields to find the username and password in.
     public var usernamePostField: String = "username"
