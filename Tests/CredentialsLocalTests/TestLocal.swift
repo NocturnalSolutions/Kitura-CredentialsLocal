@@ -50,7 +50,7 @@ class TestLocal : XCTestCase {
     
     func testNoCredentialsSimple() {
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", host: self.host, path: "/log-in", callback: {response in
+            self.performRequest(method: "post", host: self.host, path: "/private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
                 XCTAssertEqual(response?.statusCode, HTTPStatusCode.unauthorized, "HTTP Status code was \(String(describing: response?.statusCode))")
                 expectation.fulfill()
@@ -60,9 +60,9 @@ class TestLocal : XCTestCase {
 
     func testNoCredentialsRequest() {
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", host: self.host, path: "/request-log-in", callback: {response in
+            self.performRequest(method: "get", host: self.host, path: "/request-private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.unauthorized, "HTTP Status code was \(String(describing: response?.statusCode))")
+                XCTAssertEqual(response?.statusCode, HTTPStatusCode.forbidden, "HTTP Status code was \(String(describing: response?.statusCode))")
                 expectation.fulfill()
             })
         }
@@ -71,9 +71,9 @@ class TestLocal : XCTestCase {
     func testBadCredentialsSimple() {
         // Good username, bad password
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", path:"/log-in", callback: {response in
+            self.performRequest(method: "post", path:"/private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.unauthorized, "HTTP Status code was \(String(describing: response?.statusCode))")
+                XCTAssertEqual(response?.statusCode, HTTPStatusCode.forbidden, "HTTP Status code was \(String(describing: response?.statusCode))")
                 expectation.fulfill()
             }, headers: ["Content-Type": "application/x-www-form-urlencoded"], requestModifier: { request in
                 request.write(from: "username=John&password=wrongPassword")
@@ -83,9 +83,9 @@ class TestLocal : XCTestCase {
         
         // Good password, bad username
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", path:"/log-in", callback: {response in
+            self.performRequest(method: "post", path:"/private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.unauthorized, "HTTP Status code was \(String(describing: response?.statusCode))")
+                XCTAssertEqual(response?.statusCode, HTTPStatusCode.forbidden, "HTTP Status code was \(String(describing: response?.statusCode))")
                 expectation.fulfill()
             }, headers: ["Content-Type": "application/x-www-form-urlencoded"], requestModifier: { request in
                 request.write(from: "username=Maria&password=qwerasdf")
@@ -96,9 +96,9 @@ class TestLocal : XCTestCase {
     func testBadCredentialsRequest() {
         // Good username, bad password
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", path:"/request-log-in", callback: {response in
+            self.performRequest(method: "post", path:"/request-private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.unauthorized, "HTTP Status code was \(String(describing: response?.statusCode))")
+                XCTAssertEqual(response?.statusCode, HTTPStatusCode.forbidden, "HTTP Status code was \(String(describing: response?.statusCode))")
                 expectation.fulfill()
             }, headers: ["Content-Type": "application/x-www-form-urlencoded"], requestModifier: { request in
                 request.write(from: "username=John&password=wrongPassword")
@@ -108,9 +108,9 @@ class TestLocal : XCTestCase {
 
         // Good password, bad username
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", path:"/request-log-in", callback: {response in
+            self.performRequest(method: "post", path:"/request-private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.unauthorized, "HTTP Status code was \(String(describing: response?.statusCode))")
+                XCTAssertEqual(response?.statusCode, HTTPStatusCode.forbidden, "HTTP Status code was \(String(describing: response?.statusCode))")
                 expectation.fulfill()
             }, headers: ["Content-Type": "application/x-www-form-urlencoded"], requestModifier: { request in
                 request.write(from: "username=Maria&password=qwerasdf")
@@ -120,7 +120,7 @@ class TestLocal : XCTestCase {
 
     func testGoodCredentialsSimple() {
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", path:"/log-in", callback: {response in
+            self.performRequest(method: "post", path:"/private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
                 XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "HTTP Status code was \(String(describing: response?.statusCode))")
                 do {
@@ -139,7 +139,7 @@ class TestLocal : XCTestCase {
 
     func testGoodCredentialsRequest() {
         performServerTest(router: router) { expectation in
-            self.performRequest(method: "post", path:"/request-log-in", callback: {response in
+            self.performRequest(method: "post", path:"/request-private", callback: {response in
                 XCTAssertNotNil(response, "ERROR!!! ClientRequest response object was nil")
                 XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "HTTP Status code was \(String(describing: response?.statusCode))")
                 do {
@@ -170,16 +170,10 @@ class TestLocal : XCTestCase {
         let users = ["John" : "12345", "Mary" : "qwerasdf"]
 
         // Set up credentials for a simple (username and password) callback
-        let simpleCredents = Credentials(options: [
-            "failureRedirect": "/failure",
-            "successRedirect": "/private/success"
-        ])
+        let simpleCredents = Credentials()
 
         // Set up Credentials for a request callback
-        let requestCredents = Credentials(options: [
-            "failureRedirect": "/failure",
-            "successRedirect": "/request-private/success"
-        ])
+        let requestCredents = Credentials()
 
         // Set up simple verification callback
         let simpleCallbackLocal = CredentialsLocal() { userId, password, callback in
@@ -214,10 +208,6 @@ class TestLocal : XCTestCase {
         router.all("/private", middleware: simpleCredents)
         router.all("/request-private", middleware: requestCredents)
 
-        // Set up paths to handle the log in "form" submission
-        router.post("/log-in", handler: simpleCredents.authenticate(credentialsType: simpleCallbackLocal.name))
-        router.post("/request-log-in", handler: requestCredents.authenticate(credentialsType: requestCallbackLocal.name))
-
         // Set up a handler for a "successful" log in
         let successHandler: (RouterRequest, RouterResponse, @escaping () -> Void ) -> Void = {request, response, next in
             response.headers["Content-Type"] = "text/html; charset=utf-8"
@@ -236,17 +226,9 @@ class TestLocal : XCTestCase {
         }
 
         // Set up our success page routes
-        router.all("/private/success", handler: successHandler)
-        router.all("/request-private/success", handler: successHandler)
+        router.all("/private", handler: successHandler)
+        router.all("/request-private", handler: successHandler)
 
-        // Set up our failure page route
-        router.all("/failure") { _, response, next in
-            response.status(.unauthorized)
-            response.send("You're not authorized.")
-            Log.info("/failure handler reached")
-            next()
-        }
-        
         return router
     }
 }
