@@ -48,7 +48,38 @@ let local = CredentialsLocal() { request, callback in
 }
 ```
 
-Here’s a sample main.swift with a more complete implementation example. (If you're not already well familiar with how to use forms with Kitura, I suggest reading the [relevant chapter](https://nocturnalsolutions.gitbooks.io/kitura-book/content/8-forms.html) in [Kitura Until Dawn](https://nocturnalsolutions.gitbooks.io/kitura-book/content/), my free Kitura e-book.)
+After instantiating CredentialsLocal, you should add it as a plug-in to a Credentials instance, then assign the latter instance to a router handler that handles the logging in action of your application. For example, if you have a form which posts to `/log-in`:
+
+```swift
+let simpleCredents = Credentials()
+let simpleCallbackLocal = CredentialsLocal() { userId, password, callback in
+    // …
+}
+simpleCredents.register(plugin: simpleCallbackLocal)
+router.post("/log-in", middleware: simpleCredents)
+```
+
+### Access Restriction
+
+Note that if blocking access to certain pages to those who are not authenticated is your goal, you’ll need to write the code for that yourself. A simple example would be [writing a RouterMiddleware](https://nocturnalsolutions.gitbooks.io/kitura-book/4-middleware.html) class which looks something like:
+
+```swift
+public class Restrictor: RouterMiddleware {
+    public func handle(request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws {
+        guard let _ = request.userProfile else {
+            try! response.send("Access denied.").status(.forbidden).end()
+            return
+        }
+        next()
+    }
+}
+```
+
+And then attaching that as middleware to, say, an `/admin` path in your application.
+
+### Full Example
+
+Here’s a sample main.swift with a more complete implementation example with a log-in form. It also uses the “Restrictor” middleware as demonstrated above. (If you're not already well familiar with how to use forms with Kitura, I suggest reading the [relevant chapter](https://nocturnalsolutions.gitbooks.io/kitura-book/content/8-forms.html) in [Kitura Until Dawn](https://nocturnalsolutions.gitbooks.io/kitura-book/content/), my free Kitura e-book.)
 
 ```swift
 
@@ -57,63 +88,41 @@ import Credentials
 import CredentialsLocal
 import KituraSession
 
-let r = Router()
+let router = Router()
 
-// Initialize Session; have it work on all requests
-let session = Session(secret: "Some Unique Secret String")
-r.all(middleware: session)
+let session = Session(secret: "I like turtles.")
+router.all(middleware: session)
 
-// Parse the request body on all POST requests.
-r.post(middleware: BodyParser())
+router.post(middleware: BodyParser())
 
-// Initialize Credentials with some paths to redirect the user to on success and
-// failure
-let creds = Credentials(options: [
-    "failureRedirect": "/log-in",
-    "successRedirect": "/admin",
-])
+let simpleCredents = Credentials()
+let simpleCallbackLocal = CredentialsLocal() { userId, password, callback in
+    let users = ["John" : "12345", "Mary" : "qwerasdf"]
+    if let storedPassword = users[userId] {
+        if (storedPassword == password) {
+            callback(UserProfile(id: userId, displayName: userId, provider: "Local"))
+            return
+        }
+    }
+    // else if userId or password doesnt match
+    callback(nil)
+}
+simpleCredents.register(plugin: simpleCallbackLocal)
 
-// Initialize CredentialsLocal with a closure called to validate the posted
-// username and password
-let local = CredentialsLocal() { username, password, callback in
-    // Check to see if the username is "name" and the password is "pass". In
-    // real use you'd probably be doing something like hashing the password and
-    // checking for the credentials in a database.
-    if username == "user", password == "pass" {
-        // On success, pass a UserProfile object to the callback.
-        let userProfile = UserProfile(id: username, displayName: username, provider: "Local")
-        callback(userProfile)
+router.all("/admin", middleware: Restrictor())
+
+router.all("/admin") { request, response, next in
+    if let profile = request.userProfile  {
+        response.send("\(profile.displayName) is logged in with \(profile.provider)")
     }
     else {
-        // On failure, pass nil to the callback.
-        callback(nil)
+        response.send("This shouldn't have happened.").status(.unauthorized)
     }
-}
-
-// The plug-in by default assumes the username and password fields on your
-// credentials form will be named "username" and "password" respectively. If you
-// wish to name something different, you can do so as below:
-// local.usernamePostField = "user-id"
-// local.passwordPostField = "passphrase"
-
-// Have Credentials use our new CredentialsLocal object as a plugin.
-creds.register(plugin: local)
-
-// We want all actions under the "admin" path to require valid credentials.
-r.all("/admin", middleware: creds)
-
-// Show a sample restricted page at "/admin". If the user tries to get here when
-// not logged in, they will be redirected to "/log-in".
-r.get("/admin") { _, response, next in
-    response.send("You are logged in!")
     next()
 }
 
-// Show a credentials form at the "/log-in" path.
-r.get("/log-in") { request, response, next in
-    // Render a log in form wtih "username" and "password" fields that POSTs to
-    // "/log-in". In real use you probably want to use a templating engine like
-    // Stencil to do this.
+router.post("/log-in", middleware: simpleCredents)
+router.get("/log-in") { request, response, next in
     let page = """
 <!DOCTYPE html>
 <html><body>
@@ -128,14 +137,24 @@ r.get("/log-in") { request, response, next in
     next()
 }
 
-// Have Credentials test for valid credentials on a POST to "/log-in".
-r.post("/log-in", handler: creds.authenticate(credentialsType: local.name))
+router.post("/log-in") { request, response, next in
+    if let _ = request.userProfile {
+        try response.redirect("/admin").end()
+    }
+    else {
+        response.send("Access denied.").status(.unauthorized)
+    }
+    next()
+}
 
 // Kick off Kitura
-Kitura.addHTTPServer(onPort: 8080, with: r)
+Kitura.addHTTPServer(onPort: 8080, with: router)
 Kitura.run()
-
 ```
+
+## Upgrading
+
+Version 1.0 of this Credentials plug-in was a redirecting plug-in, which basically means that it would try to redirect unauthorized users to a log in form page. I decided that wasn’t a great idea since often it is more desirable to just show the user an “access denied” message rather than redirecting them, so I refactored the plug-in as a non-redirecting one. In real world terms, this means that you need to be aware that this redirection will no longer happen after upgrading the module and you will need to implement your own code to do any sort of access restriction and/or redirection.
 
 ## Troubleshooting
 
