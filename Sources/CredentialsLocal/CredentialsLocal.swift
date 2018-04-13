@@ -1,6 +1,7 @@
 import Foundation
 import Kitura
 import KituraNet
+import KituraSession
 import Credentials
 import LoggerAPI
 
@@ -9,7 +10,7 @@ public class CredentialsLocal: CredentialsPluginProtocol {
 
     public var usersCache: NSCache<NSString, BaseCacheElement>?
 
-    public let redirecting: Bool = true
+    public let redirecting: Bool = false
 
     // POST fields to find the username and password in.
     public var usernamePostField: String = "username"
@@ -23,6 +24,7 @@ public class CredentialsLocal: CredentialsPluginProtocol {
         let successOrFailure: (UserProfile?) -> Void = { userProfile in
             if let userProfile = userProfile {
                 Log.info("CredentialsLocal: UserProfile created")
+                CredentialsLocal.store(userProfile: userProfile, in: request.session!)
                 onSuccess(userProfile)
             }
             else {
@@ -59,5 +61,46 @@ public class CredentialsLocal: CredentialsPluginProtocol {
         self.verifyRequest = verifyRequest
     }
 
+    // Store a user profile in a session. This is copied from Credentials.swift
+    // where we can't use it since it's static. :(
+    private static func store(userProfile: UserProfile, in session: SessionState) {
+        var dictionary = [String:Any]()
+        dictionary["displayName"] = userProfile.displayName
+        dictionary["provider"] = userProfile.provider
+        dictionary["id"] = userProfile.id
+
+        if let name = userProfile.name {
+            dictionary["familyName"] = name.familyName
+            dictionary["givenName"] = name.givenName
+            dictionary["middleName"] = name.middleName
+        }
+
+        if let emails = userProfile.emails {
+            var emailsArray = [String]()
+            var emailTypesArray = [String]()
+            for email in emails {
+                emailsArray.append(email.value)
+                emailTypesArray.append(email.type)
+            }
+            dictionary["emails"] = emailsArray
+            dictionary["emailTypes"] = emailTypesArray
+        }
+
+        if let photos = userProfile.photos {
+            var photosArray = [String]()
+            for photo in photos {
+                photosArray.append(photo.value)
+            }
+            dictionary["photos"] = photosArray
+        }
+
+        if !userProfile.extendedProperties.isEmpty {
+            dictionary["extendedProperties"] = userProfile.extendedProperties
+        }
+
+        session["userProfile"] = dictionary
+    }
+
 
 }
+
