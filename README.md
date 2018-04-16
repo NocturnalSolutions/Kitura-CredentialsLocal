@@ -61,7 +61,7 @@ router.post("/log-in", middleware: simpleCredents)
 
 ### Access Restriction
 
-Note that if blocking access to certain pages to those who are not authenticated is your goal, you’ll need to write the code for that yourself. A simple example would be [writing a RouterMiddleware](https://nocturnalsolutions.gitbooks.io/kitura-book/4-middleware.html) class which looks something like:
+Note that if blocking access to certain pages to those who are not authenticated is your goal, you’ll need to write the code for that yourself. A simple example would be [writing a RouterMiddleware implementation](https://nocturnalsolutions.gitbooks.io/kitura-book/4-middleware.html) which looks something like:
 
 ```swift
 public class Restrictor: RouterMiddleware {
@@ -88,18 +88,24 @@ import Credentials
 import CredentialsLocal
 import KituraSession
 
+// Initialize a Router
 let router = Router()
 
+// Initialize Session and have it be active for all requests
 let session = Session(secret: "I like turtles.")
 router.all(middleware: session)
 
+// Have the BodyParser middleware be active for all POST requests
 router.post(middleware: BodyParser())
 
+// Initialize Credentials and CredentialsLocal and configure them
 let simpleCredents = Credentials()
 let simpleCallbackLocal = CredentialsLocal() { userId, password, callback in
+    // An example "database" of usernames and passwords
     let users = ["John" : "12345", "Mary" : "qwerasdf"]
     if let storedPassword = users[userId] {
         if (storedPassword == password) {
+            // Both username and password were vaild
             callback(UserProfile(id: userId, displayName: userId, provider: "Local"))
             return
         }
@@ -109,19 +115,26 @@ let simpleCallbackLocal = CredentialsLocal() { userId, password, callback in
 }
 simpleCredents.register(plugin: simpleCallbackLocal)
 
+// Add access restriction under the "admin" path.
 router.all("/admin", middleware: Restrictor())
 
+// Add a simple handler to the base "/admin" path.
 router.all("/admin") { request, response, next in
     if let profile = request.userProfile  {
         response.send("\(profile.displayName) is logged in with \(profile.provider)")
     }
     else {
+        // This shouldn't have happened because our middleware should have
+        // stopped the request when no userProfile was created.
         response.send("This shouldn't have happened.").status(.unauthorized)
     }
     next()
 }
 
+// On POST requests to "/log-in", validate the user.
 router.post("/log-in", middleware: simpleCredents)
+
+// On GET requests to "/log-in", show a credentials form.
 router.get("/log-in") { request, response, next in
     let page = """
 <!DOCTYPE html>
@@ -137,6 +150,7 @@ router.get("/log-in") { request, response, next in
     next()
 }
 
+// If the user successfully logged in, redirect them to the "/admin" path.
 router.post("/log-in") { request, response, next in
     if let _ = request.userProfile {
         try response.redirect("/admin").end()
